@@ -37,13 +37,13 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | | | |
-| `validate_dashboard.py` | | | |
-| `pytest` | | | |
-| Số traces hợp lệ | | | |
-| Số PII leak | | | |
-| Latency P95 / TTFT P95 | | | |
-| Retrieval success rate | | | |
+| `validate_logs.py` | 30/100 | 100/100 | 21 records; 20 thiếu required fields, 20 thiếu enrichment, 0 correlation ID hợp lệ |
+| `validate_dashboard.py` | 6/6 panel | | Mới xác nhận dashboard contract YAML |
+| `pytest` | 22 passed trong 1.92s | | |
+| Số traces hợp lệ | Chưa kiểm chứng | | 10 request HTTP 200 nhưng đều trả `correlation_id=MISSING` |
+| Số PII leak | 0 | | PII scrubbing đạt tại baseline |
+| Latency P95 / TTFT P95 | Chưa đo từ structured log | | `load_test.py` ghi nhận client latency cao nhất 2074.1 ms nhưng không có TTFT |
+| Retrieval success rate | Chưa ghi nhận | | Baseline chưa log trường `tool_success` |
 
 ## 4. Logging và PII
 
@@ -65,12 +65,10 @@
 
 ## 6. Dashboard, SLO và alerts
 
-- **Dashboard và sáu panel:**
-- **SLO và lý do chọn:**
-- **Cách tính error budget:**
-- **Ba alert và runbook tương ứng:**
-
-> Ví dụ cách viết error budget: "SLO 99.5% trong 28 ngày nghĩa là error budget 0.5%. Nếu workload có 10,000 request thì tối đa 50 request được phép lỗi hoặc chậm hơn ngưỡng SLO."
+- **Dashboard và sáu panel:** Dashboard được dựng bằng Streamlit, đọc dữ liệu thật từ `data/logs.jsonl`, sử dụng time range 60 phút và tự refresh sau 30 giây. Dashboard gồm đúng sáu panel: Latency hiển thị P50/P95/P99 và TTFT P95; Traffic hiển thị số request và request/phút; Errors hiển thị error rate và retrieval success; Cost hiển thị tổng chi phí; Tokens hiển thị input/output tokens; Quality hiển thị quality score trung bình. Evidence: `evidence/11-dashboard-overview.png`
+- **SLO và lý do chọn:** SLO `fast_successful_requests` yêu cầu 99.5% request trong cửa sổ 28 ngày phải trả response thành công với `latency_ms <= 3000`. Ngưỡng 3000 ms được chọn vì đây là giới hạn latency P95 trong dashboard contract; nó phản ánh trải nghiệm chờ của người dùng và phù hợp để phát hiện các request chậm ở phần đuôi phân phối
+- **Cách tính error budget:** SLO 99.5% tương ứng error budget `100% - 99.5% = 0.5%`. Số request được phép không đạt SLO được tính bằng `total_requests × 0.005`. Ví dụ, với 10,000 request trong 28 ngày, tối đa 50 request được phép lỗi hoặc có latency lớn hơn 3000 ms
+- **Ba alert và runbook tương ứng:** `HighLatencyP95` cảnh báo khi P95 latency lớn hơn 3000 ms trong 5 phút, runbook tại `docs/alerts.md#alert-1`; `HighErrorRate` cảnh báo khi error rate lớn hơn 2% trong 5 phút, runbook tại `docs/alerts.md#alert-2`; `LowRetrievalSuccess` cảnh báo khi retrieval success rate thấp hơn 90% trong 10 phút, runbook tại `docs/alerts.md#alert-3`. Cả ba alert đều là symptom-based, có severity, owner `student-2A202602856` và gửi tới Slack `#k4-l3b-alerts`
 
 ## 7. Điều tra challenge
 
